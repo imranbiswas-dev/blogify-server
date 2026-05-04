@@ -10,10 +10,10 @@ const port = process.env.PORT || 3000;
 app.use(cors());
 app.use(express.json());
 
-// === MongoDB Connection ===
+// === MongoDB URI (FIXED) ===
+const uri = `mongodb+srv://${process.env.DB_USER}:${process.env.DB_PASSWORD}@learning-db.ch9k7k3.mongodb.net/blogify?retryWrites=true&w=majority`;
 
-const uri = `mongodb+srv://${process.env.DB_USER}:${process.env.DB_PASSWORD}@learning-db.ch9k7k3.mongodb.net/?appName=Learning-DB`;
-
+// Mongo Client
 const client = new MongoClient(uri, {
   serverApi: {
     version: ServerApiVersion.v1,
@@ -24,100 +24,138 @@ const client = new MongoClient(uri, {
 
 async function run() {
   try {
-    // Database and Collection Setup
-    const blogCollection = client.db("blogify").collection("blogs");
-    const userCollection = client.db("blogify").collection("users");
-    const bookmarkCollection = client.db("blogify").collection("bookmarks");
+    // === CONNECT MONGODB === \\
+    await client.connect();
 
-    // === Blog APIs ===
+    const db = client.db("blogify");
+    const blogCollection = db.collection("blogs");
+    const userCollection = db.collection("users");
+    const bookmarkCollection = db.collection("bookmarks");
+
+    console.log("MongoDB Connected Successfully");
+
+    // === BLOG APIs === \\
+
     app.get("/blogs", async (req, res) => {
-      const result = await blogCollection.find().toArray();
-      res.send(result);
+      try {
+        const result = await blogCollection.find().toArray();
+        res.send(result);
+      } catch (error) {
+        res.status(500).send({ error: error.message });
+      }
     });
 
     app.get("/blogs/:id", async (req, res) => {
-      const id = req.params.id;
-      const query = { _id: new ObjectId(id) };
-      const result = await blogCollection.findOne(query);
-      res.send(result);
+      try {
+        const id = req.params.id;
+        const result = await blogCollection.findOne({
+          _id: new ObjectId(id),
+        });
+        res.send(result);
+      } catch (error) {
+        res.status(500).send({ error: error.message });
+      }
     });
-
-    // === POST a new blog ===
 
     app.post("/blogs", async (req, res) => {
-      const userBlog = req.body;
-      const result = await blogCollection.insertOne(userBlog);
-      res.send(result);
+      try {
+        const result = await blogCollection.insertOne(req.body);
+        res.send(result);
+      } catch (error) {
+        res.status(500).send({ error: error.message });
+      }
     });
-
-    // === UPDATE a blog by ID ===
 
     app.put("/blogs/:id", async (req, res) => {
-      const id = req.params.id;
-      const query = { _id: new ObjectId(id) };
-      const options = { upsert: true };
-      const updatedBlog = req.body;
-      const updateDoc = {
-        $set: updatedBlog,
-      };
-      const result = await blogCollection.updateOne(query, updateDoc, options);
-      res.send(result);
+      try {
+        const result = await blogCollection.updateOne(
+          { _id: new ObjectId(req.params.id) },
+          { $set: req.body },
+          { upsert: true },
+        );
+        res.send(result);
+      } catch (error) {
+        res.status(500).send({ error: error.message });
+      }
     });
 
-    // DELETE API
     app.delete("/blogs/:id", async (req, res) => {
-      const id = req.params.id;
-      const query = { _id: new ObjectId(id) };
-      const result = await blogCollection.deleteOne(query);
-      res.send(result);
+      try {
+        const result = await blogCollection.deleteOne({
+          _id: new ObjectId(req.params.id),
+        });
+        res.send(result);
+      } catch (error) {
+        res.status(500).send({ error: error.message });
+      }
     });
 
-    // === User APIs ===
+    // === USER APIs ===
+
     app.post("/users", async (req, res) => {
-      const user = req.body;
-      const result = await userCollection.insertOne(user);
-      res.send(result);
+      try {
+        const result = await userCollection.insertOne(req.body);
+        res.send(result);
+      } catch (error) {
+        res.status(500).send({ error: error.message });
+      }
     });
 
-    // === Bookmark APIs ===
+    // === BOOKMARK APIs === \\
+
     app.get("/bookmarks", async (req, res) => {
-      const email = req.query.userEmail;
-      if (!email) return res.send([]);
-      const query = { userEmail: email };
-      const result = await bookmarkCollection.find(query).toArray();
-      res.send(result);
+      try {
+        const email = req.query.userEmail;
+        if (!email) return res.send([]);
+
+        const result = await bookmarkCollection
+          .find({ userEmail: email })
+          .toArray();
+
+        res.send(result);
+      } catch (error) {
+        res.status(500).send({ error: error.message });
+      }
     });
 
-    // === POST ===
     app.post("/bookmarks", async (req, res) => {
-      const bookmark = req.body;
-      const result = await bookmarkCollection.insertOne(bookmark);
-      res.send(result);
+      try {
+        const result = await bookmarkCollection.insertOne(req.body);
+        res.send(result);
+      } catch (error) {
+        res.status(500).send({ error: error.message });
+      }
     });
 
-    // === DELETE ===
     app.delete("/bookmarks/:id", async (req, res) => {
-      const id = req.params.id;
-      const query = { _id: new ObjectId(id) };
-      const result = await bookmarkCollection.deleteOne(query);
-      res.send(result);
+      try {
+        const result = await bookmarkCollection.deleteOne({
+          _id: new ObjectId(req.params.id),
+        });
+        res.send(result);
+      } catch (error) {
+        res.status(500).send({ error: error.message });
+      }
     });
 
-    // Ping check
+    // === Ping test === \\
     await client.db("admin").command({ ping: 1 });
-    console.log("Connected to MongoDB, Sir!");
+    console.log("MongoDB Ping Successful");
   } catch (error) {
-    console.error("Connection error:", error);
-  } finally {
-    // keep connection open
+    console.error("DB Connection Error:", error);
   }
 }
+
 run().catch(console.dir);
 
+// === ROOT ROUTE === \\
+
 app.get("/", (req, res) => {
-  res.send("Blogify Server is Running, Sir!");
+  res.send("Blogify Server is Running ");
 });
 
+// === START SERVER === \\
+
 app.listen(port, () => {
-  console.log(`Server listening on port ${port}`);
+  console.log(`Server running on port ${port}`);
 });
