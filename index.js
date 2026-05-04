@@ -138,6 +138,10 @@ async function run() {
       }
     });
 
+    app.get("/test", (req, res) => {
+      res.send("API WORKING");
+    });
+
     // === Ping test === \\
     await client.db("admin").command({ ping: 1 });
     console.log("MongoDB Ping Successful");
